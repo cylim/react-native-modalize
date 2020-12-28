@@ -82,6 +82,11 @@ export interface IProps<ListItem = any> {
   modalStyle?: TStyle;
 
   /**
+   *  the style of the modal radius.
+   */
+  radiusStyle?: ViewStyle | ViewStyle[] ;
+
+  /**
    * Define the style of the handle on top of the modal.
    */
   handleStyle?: TStyle;
@@ -95,6 +100,12 @@ export interface IProps<ListItem = any> {
    * Define the style of the children renderer (only the inside part).
    */
   childrenStyle?: TStyle;
+
+  /**
+   * If true, makes the modal slide from top.
+   * @default false
+   */
+  fromTop?: boolean;
 
   /**
    * A number that will enable the snapping feature and create an intermediate point before opening the modal to full screen.

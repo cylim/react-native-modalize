@@ -71,6 +71,7 @@ const ModalizeBase = (
     handleStyle,
     overlayStyle,
     childrenStyle,
+    radiusStyle: propRadiusStyle,
 
     // Layout
     snapPoint,
@@ -82,6 +83,7 @@ const ModalizeBase = (
     }),
     alwaysOpen,
     adjustToContentHeight = false,
+    fromTop = false,
 
     // Options
     handlePosition = 'outside',
@@ -138,11 +140,17 @@ const ModalizeBase = (
   const { height: screenHeight } = useDimensions();
   const isHandleOutside = handlePosition === 'outside';
   const handleHeight = withHandle ? 20 : isHandleOutside ? 35 : 20;
-  const fullHeight = screenHeight - modalTopOffset;
-  const computedHeight = fullHeight - handleHeight - (isIphoneX ? 34 : 0);
+  const fullHeight = isIos
+    ? screenHeight - modalTopOffset
+    : screenHeight - 10 - modalTopOffset;
+  const computedHeight =
+    fullHeight - (fromTop ? 0 : handleHeight) - (isIphoneX ? 34 : 0);
   const endHeight = modalHeight || computedHeight;
   const adjustValue = adjustToContentHeight ? undefined : endHeight;
-  const snaps = snapPoint ? [0, endHeight - snapPoint, endHeight] : [0, endHeight];
+  const snapTopOffset = fromTop ? -screenHeight : 0;
+  const snaps = snapPoint ? [snapTopOffset,
+    endHeight - snapPoint + snapTopOffset,
+    endHeight + snapTopOffset] : [snapTopOffset, endHeight + snapTopOffset];
 
   const [modalHeightValue, setModalHeightValue] = React.useState(adjustValue);
   const [lastSnap, setLastSnap] = React.useState(snapPoint ? endHeight - snapPoint : 0);
@@ -164,7 +172,7 @@ const ModalizeBase = (
   const overlay = React.useRef(new Animated.Value(0)).current;
   const beginScrollY = React.useRef(new Animated.Value(0)).current;
   const dragY = React.useRef(new Animated.Value(0)).current;
-  const translateY = React.useRef(new Animated.Value(screenHeight)).current;
+  const translateY = React.useRef(new Animated.Value(fromTop ? -screenHeight : screenHeight)).current;
   const reverseBeginScrollY = React.useRef(Animated.multiply(new Animated.Value(-1), beginScrollY))
     .current;
 
@@ -243,6 +251,10 @@ const ModalizeBase = (
       toValue = (modalHeightValue || 0) - snapPoint;
     }
 
+    if (fromTop) {
+      toValue = -toValue
+    }
+
     if (panGestureAnimatedValue && (alwaysOpenValue || snapPoint)) {
       toPanValue = 0;
     } else if (
@@ -272,25 +284,25 @@ const ModalizeBase = (
 
       panGestureAnimatedValue
         ? Animated.timing(panGestureAnimatedValue, {
-            toValue: toPanValue,
-            duration: PAN_DURATION,
-            easing: Easing.ease,
-            useNativeDriver,
-          })
+          toValue: toPanValue,
+          duration: PAN_DURATION,
+          easing: Easing.ease,
+          useNativeDriver,
+        })
         : Animated.delay(0),
 
       spring
         ? Animated.spring(translateY, {
-            ...getSpringConfig(spring),
-            toValue,
-            useNativeDriver: USE_NATIVE_DRIVER,
-          })
+          ...getSpringConfig(spring),
+          toValue,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        })
         : Animated.timing(translateY, {
-            toValue,
-            duration: timing.duration,
-            easing: timing.easing,
-            useNativeDriver: USE_NATIVE_DRIVER,
-          }),
+          toValue,
+          duration: timing.duration,
+          easing: timing.easing,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
     ]).start(() => {
       if (onOpened) {
         onOpened();
@@ -307,9 +319,12 @@ const ModalizeBase = (
   const handleAnimateClose = (dest: TClose = 'default'): void => {
     const { timing, spring } = closeAnimationConfig;
     const lastSnapValue = snapPoint ? snaps[1] : 80;
-    const toInitialAlwaysOpen = dest === 'alwaysOpen' && Boolean(alwaysOpen);
-    const toValue =
-      toInitialAlwaysOpen && alwaysOpen ? (modalHeightValue || 0) - alwaysOpen : screenHeight;
+    const toInitialAlwaysOpen =  Boolean(alwaysOpen);
+    let toValue =
+      toInitialAlwaysOpen ? (modalHeightValue || 0) - (alwaysOpen || 0) : screenHeight;
+    if(fromTop) {
+      toValue = -toValue
+    }
 
     backButtonListenerRef.current?.remove();
     cancelTranslateY.setValue(1);
@@ -326,26 +341,33 @@ const ModalizeBase = (
 
       panGestureAnimatedValue
         ? Animated.timing(panGestureAnimatedValue, {
-            toValue: 0,
-            duration: PAN_DURATION,
-            easing: Easing.ease,
-            useNativeDriver,
-          })
+          toValue: 0,
+          duration: PAN_DURATION,
+          easing: Easing.ease,
+          useNativeDriver,
+        })
         : Animated.delay(0),
 
       spring
         ? Animated.spring(translateY, {
-            ...getSpringConfig(spring),
-            toValue,
-            useNativeDriver: USE_NATIVE_DRIVER,
-          })
+          ...getSpringConfig(spring),
+          toValue,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        })
         : Animated.timing(translateY, {
-            duration: timing.duration,
-            easing: Easing.out(Easing.ease),
-            toValue,
-            useNativeDriver: USE_NATIVE_DRIVER,
-          }),
+          duration: timing.duration,
+          easing: Easing.out(Easing.ease),
+          toValue,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
     ]).start(() => {
+      setShowContent(toInitialAlwaysOpen);
+      translateY.setValue(toValue);
+      dragY.setValue(0);
+      willCloseModalize = false;
+      setLastSnap(lastSnapValue);
+      setIsVisible(toInitialAlwaysOpen);
+
       if (onClosed) {
         onClosed();
       }
@@ -357,13 +379,6 @@ const ModalizeBase = (
       if (alwaysOpen && dest === 'alwaysOpen') {
         setModalPosition('initial');
       }
-
-      setShowContent(toInitialAlwaysOpen);
-      translateY.setValue(toValue);
-      dragY.setValue(0);
-      willCloseModalize = false;
-      setLastSnap(lastSnapValue);
-      setIsVisible(toInitialAlwaysOpen);
     });
   };
 
@@ -371,11 +386,11 @@ const ModalizeBase = (
     const value = Math.min(
       layout.height + (!adjustToContentHeight || keyboardHeight ? layout.y : 0),
       endHeight -
-        Platform.select({
-          ios: 0,
-          android: keyboardHeight,
-          default: 0,
-        }),
+      Platform.select({
+        ios: 0,
+        android: keyboardHeight,
+        default: 0,
+      }),
     );
 
     setModalHeightValue(value);
@@ -443,13 +458,14 @@ const ModalizeBase = (
     { nativeEvent }: PanGestureHandlerStateChangeEvent,
     type?: 'component' | 'children',
   ): void => {
+    const translationMultiplier = fromTop ? -1 : 1;
     const { timing } = closeAnimationConfig;
     const { velocityY, translationY } = nativeEvent;
     const negativeReverseScroll =
       modalPosition === 'top' &&
       beginScrollYValue >= (snapPoint ? 0 : SCROLL_THRESHOLD) &&
       translationY < 0;
-    const thresholdProps = translationY > threshold && beginScrollYValue === 0;
+    const thresholdProps = translationMultiplier * translationY > threshold && beginScrollYValue === 0;
     const closeThreshold = velocity
       ? (beginScrollYValue <= 20 && velocityY >= velocity) || thresholdProps
       : thresholdProps;
@@ -493,8 +509,8 @@ const ModalizeBase = (
       isAndroid
         ? false
         : alwaysOpen
-        ? beginScrollYValue > 0 || translationY < 0
-        : enableBouncesValue,
+          ? beginScrollYValue > 0 || translationY < 0
+          : enableBouncesValue,
     );
 
     if (nativeEvent.oldState === State.ACTIVE) {
@@ -537,7 +553,7 @@ const ModalizeBase = (
 
           // For alwaysOpen props
           if (distFromSnap < diffPoint && alwaysOpen && beginScrollYValue <= 0) {
-            destSnapPoint = (modalHeightValue || 0) - alwaysOpen;
+            destSnapPoint = ((modalHeightValue || 0) - alwaysOpen);
             willCloseModalize = false;
           }
         });
@@ -569,7 +585,7 @@ const ModalizeBase = (
         tension: 50,
         friction: 12,
         velocity: velocityY,
-        toValue: destSnapPoint,
+        toValue: translationMultiplier * destSnapPoint,
         useNativeDriver: USE_NATIVE_DRIVER,
       }).start();
 
@@ -639,13 +655,19 @@ const ModalizeBase = (
           value = y;
         }
 
+        if(fromTop) {
+          value = -value
+        }
+
         panGestureAnimatedValue.setValue(value);
       }
     },
   });
 
   const renderHandle = (): JSX.Element | null => {
-    const handleStyles: (TStyle | undefined)[] = [s.handle];
+    const handlePosition = fromTop ? { bottom: -20 } : { top: -20 };
+    const handleBottomPosition = fromTop ? { bottom: 0 } : { top: 0 };
+    const handleStyles: any[] = [s.handle, handlePosition];
     const shapeStyles: (TStyle | undefined)[] = [s.handle__shape, handleStyle];
 
     if (!withHandle) {
@@ -653,7 +675,7 @@ const ModalizeBase = (
     }
 
     if (!isHandleOutside) {
-      handleStyles.push(s.handleBottom);
+      handleStyles.push(handleBottomPosition);
       shapeStyles.push(s.handle__shapeBottom, handleStyle);
     }
 
@@ -841,7 +863,6 @@ const ModalizeBase = (
       if (onOpen) {
         onOpen();
       }
-
       handleAnimateOpen(alwaysOpen, dest);
     },
 
@@ -893,6 +914,8 @@ const ModalizeBase = (
     };
   }, []);
 
+  const marginProp = fromTop ? { marginBottom: 'auto' } : { marginTop: 'auto' };
+  const fromTopOffset = fromTop ? -screenHeight : 0;
   const keyboardAvoidingViewProps: Animated.AnimatedProps<KeyboardAvoidingViewProps> = {
     keyboardVerticalOffset: keyboardAvoidingOffset,
     behavior: keyboardAvoidingBehavior,
@@ -906,12 +929,13 @@ const ModalizeBase = (
         transform: [
           {
             translateY: value.interpolate({
-              inputRange: [-40, 0, endHeight],
-              outputRange: [0, 0, endHeight],
+              inputRange: [-40 + fromTopOffset, fromTopOffset, endHeight],
+              outputRange: [fromTopOffset, fromTopOffset, endHeight],
               extrapolate: 'clamp',
             }),
           },
         ],
+        ...marginProp,
       },
     ],
   };
@@ -919,6 +943,11 @@ const ModalizeBase = (
   if (!avoidKeyboardLikeIOS && !adjustToContentHeight) {
     keyboardAvoidingViewProps.onLayout = handleModalizeContentLayout;
   }
+
+  // const enabled = isIos && adjustToContentHeight;
+  const radiusStyle = fromTop
+    ? { borderBottomLeftRadius: 12, borderBottomRightRadius: 12 }
+    : { borderTopLeftRadius: 12, borderTopRightRadius: 12 };
 
   const renderModalize = (
     <View
@@ -933,7 +962,13 @@ const ModalizeBase = (
       >
         <View style={s.modalize__wrapper} pointerEvents="box-none">
           {showContent && (
-            <AnimatedKeyboardAvoidingView {...keyboardAvoidingViewProps}>
+            <AnimatedKeyboardAvoidingView {...keyboardAvoidingViewProps} style={[
+              ...((keyboardAvoidingViewProps as any).style ?? []),
+              propRadiusStyle || radiusStyle,
+              ,
+            ]}
+              behavior={keyboardAvoidingBehavior || 'padding'}
+            >
               {renderHandle()}
               {renderComponent(HeaderComponent, 'header')}
               {renderChildren()}
