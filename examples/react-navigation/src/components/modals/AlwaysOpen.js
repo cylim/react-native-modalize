@@ -7,6 +7,8 @@ import { Button } from '../button/Button';
 
 export const AlwaysOpen = () => {
   const modalizeRef = useRef(null);
+  const contentRef = useRef(null);
+  const [opened, setOpened] = React.useState(false);
 
   const handleClose = dest => {
     if (modalizeRef.current) {
@@ -16,7 +18,6 @@ export const AlwaysOpen = () => {
 
   const renderContent = () => (
     <View style={s.content}>
-      <Text style={s.content__subheading}>{'Introduction'.toUpperCase()}</Text>
       <Text style={s.content__heading}>Always open modal!</Text>
       <Text style={s.content__description}>{faker.lorem.paragraph()}</Text>
       <Button name="Close to initial position" onPress={() => handleClose('alwaysOpen')} />
@@ -24,12 +25,37 @@ export const AlwaysOpen = () => {
     </View>
   );
 
+  onOpen = () => {
+    setOpened(true);
+  };
+  onClose = () => {
+    setOpened(false);
+    contentRef.current.getScrollResponder().scrollTo({ x: 0, y: 0, animated: true });
+  };
+  handlePositionChange = value => {
+    setOpened(value === 'top');
+  };
+
   return (
     <Modalize
+      tapGestureEnabled={false}
+      modalTopOffset={80}
+      contentRef={contentRef}
+      onPositionChange={handlePositionChange}
+      onOpen={onOpen}
+      onClose={onClose}
+      panGestureEnabled={opened ? false : true}
+      disableScrollIfPossible={false}
+      fromTop
       ref={modalizeRef}
       modalStyle={s.content__modal}
-      alwaysOpen={85}
+      alwaysOpen={120}
       handlePosition="inside"
+      HeaderComponent={() => (
+        <View style={s.content}>
+          <Text style={s.content__subheading}>{'Introduction'.toUpperCase()}</Text>
+        </View>
+      )}
     >
       {renderContent()}
     </Modalize>
@@ -49,9 +75,8 @@ const s = StyleSheet.create({
   },
 
   content__subheading: {
-    marginBottom: 2,
-
     fontSize: 16,
+    // marginTop:40,
     fontWeight: '600',
     color: '#ccc',
   },

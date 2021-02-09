@@ -140,17 +140,14 @@ const ModalizeBase = (
   const { height: screenHeight } = useDimensions();
   const isHandleOutside = handlePosition === 'outside';
   const handleHeight = withHandle ? 20 : isHandleOutside ? 35 : 20;
-  const fullHeight = isIos
-    ? screenHeight - modalTopOffset
-    : screenHeight - 10 - modalTopOffset;
-  const computedHeight =
-    fullHeight - (fromTop ? 0 : handleHeight) - (isIphoneX ? 34 : 0);
+  const fullHeight = isIos ? screenHeight - modalTopOffset : screenHeight - 10 - modalTopOffset;
+  const computedHeight = fullHeight - (fromTop ? 0 : handleHeight) - (isIphoneX ? 34 : 0);
   const endHeight = modalHeight || computedHeight;
   const adjustValue = adjustToContentHeight ? undefined : endHeight;
   const snapTopOffset = fromTop ? -screenHeight : 0;
-  const snaps = snapPoint ? [snapTopOffset,
-    endHeight - snapPoint + snapTopOffset,
-    endHeight + snapTopOffset] : [snapTopOffset, endHeight + snapTopOffset];
+  const snaps = snapPoint
+    ? [snapTopOffset, endHeight - snapPoint + snapTopOffset, endHeight + snapTopOffset]
+    : [snapTopOffset, endHeight + snapTopOffset];
 
   const [modalHeightValue, setModalHeightValue] = React.useState(adjustValue);
   const [lastSnap, setLastSnap] = React.useState(snapPoint ? endHeight - snapPoint : 0);
@@ -172,9 +169,11 @@ const ModalizeBase = (
   const overlay = React.useRef(new Animated.Value(0)).current;
   const beginScrollY = React.useRef(new Animated.Value(0)).current;
   const dragY = React.useRef(new Animated.Value(0)).current;
-  const translateY = React.useRef(new Animated.Value(fromTop ? -screenHeight : screenHeight)).current;
-  const reverseBeginScrollY = React.useRef(Animated.multiply(new Animated.Value(-1), beginScrollY))
+  const translateY = React.useRef(new Animated.Value(fromTop ? -screenHeight : screenHeight))
     .current;
+  const reverseBeginScrollY = React.useRef(
+    Animated.multiply(new Animated.Value(fromTop ? 1 : -1), beginScrollY),
+  ).current;
 
   const tapGestureModalizeRef = React.useRef<TapGestureHandler>(null);
   const panGestureChildrenRef = React.useRef<PanGestureHandler>(null);
@@ -200,7 +199,10 @@ const ModalizeBase = (
 
   let willCloseModalize = false;
 
-  beginScrollY.addListener(({ value }) => setBeginScrollYValue(value));
+  beginScrollY.addListener(({ value }) => {
+    console.log(value);
+    setBeginScrollYValue(value);
+  });
 
   const handleBackPress = (): boolean => {
     if (alwaysOpen) {
@@ -232,6 +234,7 @@ const ModalizeBase = (
     alwaysOpenValue: number | undefined,
     dest: TOpen = 'default',
   ): void => {
+    console.log('handleAnimateOpen');
     const { timing, spring } = openAnimationConfig;
 
     (backButtonListenerRef as any).current = BackHandler.addEventListener(
@@ -252,7 +255,7 @@ const ModalizeBase = (
     }
 
     if (fromTop) {
-      toValue = -toValue
+      toValue = -toValue;
     }
 
     if (panGestureAnimatedValue && (alwaysOpenValue || snapPoint)) {
@@ -284,25 +287,25 @@ const ModalizeBase = (
 
       panGestureAnimatedValue
         ? Animated.timing(panGestureAnimatedValue, {
-          toValue: toPanValue,
-          duration: PAN_DURATION,
-          easing: Easing.ease,
-          useNativeDriver,
-        })
+            toValue: toPanValue,
+            duration: PAN_DURATION,
+            easing: Easing.ease,
+            useNativeDriver,
+          })
         : Animated.delay(0),
 
       spring
         ? Animated.spring(translateY, {
-          ...getSpringConfig(spring),
-          toValue,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        })
+            ...getSpringConfig(spring),
+            toValue,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          })
         : Animated.timing(translateY, {
-          toValue,
-          duration: timing.duration,
-          easing: timing.easing,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
+            toValue,
+            duration: timing.duration,
+            easing: timing.easing,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          }),
     ]).start(() => {
       if (onOpened) {
         onOpened();
@@ -317,13 +320,13 @@ const ModalizeBase = (
   };
 
   const handleAnimateClose = (dest: TClose = 'default'): void => {
+    console.log('handleAnimateClose');
     const { timing, spring } = closeAnimationConfig;
     const lastSnapValue = snapPoint ? snaps[1] : 80;
-    const toInitialAlwaysOpen =  Boolean(alwaysOpen);
-    let toValue =
-      toInitialAlwaysOpen ? (modalHeightValue || 0) - (alwaysOpen || 0) : screenHeight;
-    if(fromTop) {
-      toValue = -toValue
+    const toInitialAlwaysOpen = Boolean(alwaysOpen);
+    let toValue = toInitialAlwaysOpen ? (modalHeightValue || 0) - (alwaysOpen || 0) : screenHeight;
+    if (fromTop) {
+      toValue = -toValue;
     }
 
     backButtonListenerRef.current?.remove();
@@ -341,25 +344,25 @@ const ModalizeBase = (
 
       panGestureAnimatedValue
         ? Animated.timing(panGestureAnimatedValue, {
-          toValue: 0,
-          duration: PAN_DURATION,
-          easing: Easing.ease,
-          useNativeDriver,
-        })
+            toValue: 0,
+            duration: PAN_DURATION,
+            easing: Easing.ease,
+            useNativeDriver,
+          })
         : Animated.delay(0),
 
       spring
         ? Animated.spring(translateY, {
-          ...getSpringConfig(spring),
-          toValue,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        })
+            ...getSpringConfig(spring),
+            toValue,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          })
         : Animated.timing(translateY, {
-          duration: timing.duration,
-          easing: Easing.out(Easing.ease),
-          toValue,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
+            duration: timing.duration,
+            easing: Easing.out(Easing.ease),
+            toValue,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          }),
     ]).start(() => {
       setShowContent(toInitialAlwaysOpen);
       translateY.setValue(toValue);
@@ -383,14 +386,15 @@ const ModalizeBase = (
   };
 
   const handleModalizeContentLayout = ({ nativeEvent: { layout } }: LayoutChangeEvent): void => {
+    console.log('handleModalizeContentLayout');
     const value = Math.min(
       layout.height + (!adjustToContentHeight || keyboardHeight ? layout.y : 0),
       endHeight -
-      Platform.select({
-        ios: 0,
-        android: keyboardHeight,
-        default: 0,
-      }),
+        Platform.select({
+          ios: 0,
+          android: keyboardHeight,
+          default: 0,
+        }),
     );
 
     setModalHeightValue(value);
@@ -400,6 +404,7 @@ const ModalizeBase = (
     component: 'content' | 'header' | 'footer' | 'floating',
     height: number,
   ): void => {
+    console.log('handleBaseLayout');
     setLayouts(new Map(layouts.set(component, height)));
 
     const max = Array.from(layouts).reduce((acc, cur) => acc + cur?.[1], 0);
@@ -411,6 +416,8 @@ const ModalizeBase = (
   };
 
   const handleContentLayout = ({ nativeEvent }: LayoutChangeEvent): void => {
+    console.log('handleContentLayout');
+
     if (onLayout) {
       onLayout(nativeEvent);
     }
@@ -434,6 +441,7 @@ const ModalizeBase = (
     name: 'header' | 'footer' | 'floating',
     absolute: boolean,
   ): void => {
+    console.log('handleComponentLayout');
     /**
      * We don't want to disable the scroll if we are not using adjustToContentHeight props.
      * Also, if the component is in absolute positioning we don't want to take in
@@ -447,6 +455,7 @@ const ModalizeBase = (
   };
 
   const handleClose = (dest?: TClose): void => {
+    console.log('handleClose');
     if (onClose) {
       onClose();
     }
@@ -458,6 +467,7 @@ const ModalizeBase = (
     { nativeEvent }: PanGestureHandlerStateChangeEvent,
     type?: 'component' | 'children',
   ): void => {
+    console.log('handleChildren');
     const translationMultiplier = fromTop ? -1 : 1;
     const { timing } = closeAnimationConfig;
     const { velocityY, translationY } = nativeEvent;
@@ -465,7 +475,8 @@ const ModalizeBase = (
       modalPosition === 'top' &&
       beginScrollYValue >= (snapPoint ? 0 : SCROLL_THRESHOLD) &&
       translationY < 0;
-    const thresholdProps = translationMultiplier * translationY > threshold && beginScrollYValue === 0;
+    const thresholdProps =
+      translationMultiplier * translationY > threshold && beginScrollYValue === 0;
     const closeThreshold = velocity
       ? (beginScrollYValue <= 20 && velocityY >= velocity) || thresholdProps
       : thresholdProps;
@@ -509,8 +520,8 @@ const ModalizeBase = (
       isAndroid
         ? false
         : alwaysOpen
-          ? beginScrollYValue > 0 || translationY < 0
-          : enableBouncesValue,
+        ? beginScrollYValue > 0 || translationY < 0
+        : enableBouncesValue,
     );
 
     if (nativeEvent.oldState === State.ACTIVE) {
@@ -523,6 +534,7 @@ const ModalizeBase = (
         /**
          * snapPoint and alwaysOpen use both an array of points to define the first open state and the final state.
          */
+        console.log(snaps);
         snaps.forEach((snap: number) => {
           const distFromSnap = Math.abs(snap - endOffsetY);
           const diffPoint = Math.abs(destSnapPoint - endOffsetY);
@@ -553,7 +565,7 @@ const ModalizeBase = (
 
           // For alwaysOpen props
           if (distFromSnap < diffPoint && alwaysOpen && beginScrollYValue <= 0) {
-            destSnapPoint = ((modalHeightValue || 0) - alwaysOpen);
+            destSnapPoint = (modalHeightValue || 0) - alwaysOpen;
             willCloseModalize = false;
           }
         });
@@ -617,6 +629,7 @@ const ModalizeBase = (
   };
 
   const handleComponent = ({ nativeEvent }: PanGestureHandlerStateChangeEvent): void => {
+    console.log('handleComponent');
     // If we drag from the HeaderComponent/FooterComponent/FloatingComponent we allow the translation animation
     if (nativeEvent.oldState === State.BEGAN) {
       componentTranslateY.setValue(1);
@@ -627,6 +640,8 @@ const ModalizeBase = (
   };
 
   const handleOverlay = ({ nativeEvent }: TapGestureHandlerStateChangeEvent): void => {
+    console.log('handleOverlay');
+
     if (nativeEvent.oldState === State.ACTIVE && !willCloseModalize) {
       if (onOverlayPress) {
         onOverlayPress();
@@ -641,6 +656,7 @@ const ModalizeBase = (
   const handleGestureEvent = Animated.event([{ nativeEvent: { translationY: dragY } }], {
     useNativeDriver: USE_NATIVE_DRIVER,
     listener: ({ nativeEvent: { translationY } }: PanGestureHandlerStateChangeEvent) => {
+      console.log('handleGestureEvent');
       if (panGestureAnimatedValue) {
         const offset = alwaysOpen ?? snapPoint ?? 0;
         const diff = Math.abs(translationY / (endHeight - offset));
@@ -655,8 +671,8 @@ const ModalizeBase = (
           value = y;
         }
 
-        if(fromTop) {
-          value = -value
+        if (fromTop) {
+          value = -value;
         }
 
         panGestureAnimatedValue.setValue(value);
@@ -809,8 +825,8 @@ const ModalizeBase = (
         <Animated.View style={[style, childrenStyle]}>
           <NativeViewGestureHandler
             ref={nativeViewChildrenRef}
-            waitFor={tapGestureModalizeRef}
             simultaneousHandlers={panGestureChildrenRef}
+            waitFor={tapGestureModalizeRef}
           >
             {renderContent()}
           </NativeViewGestureHandler>
@@ -962,11 +978,13 @@ const ModalizeBase = (
       >
         <View style={s.modalize__wrapper} pointerEvents="box-none">
           {showContent && (
-            <AnimatedKeyboardAvoidingView {...keyboardAvoidingViewProps} style={[
-              ...((keyboardAvoidingViewProps as any).style ?? []),
-              propRadiusStyle || radiusStyle,
-              ,
-            ]}
+            <AnimatedKeyboardAvoidingView
+              {...keyboardAvoidingViewProps}
+              style={[
+                ...((keyboardAvoidingViewProps as any).style ?? []),
+                propRadiusStyle || radiusStyle,
+                ,
+              ]}
               behavior={keyboardAvoidingBehavior || 'padding'}
             >
               {renderHandle()}
